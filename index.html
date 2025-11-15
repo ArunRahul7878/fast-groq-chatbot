@@ -23,70 +23,81 @@
     <div class="header">fast-groq-chatbot — demo</div>
     <div id="messages" class="messages" aria-live="polite"></div>
 
-    <div class="composer">
-      <input id="input" type="text" placeholder="Type a message and hit Enter" />
-      <button id="send">Send</button>
-    </div>
-    <small class="hint">This is a local frontend demo. Later we will wire it to your API.</small>
+    <div class="composer" style="flex-direction:column;gap:8px">
+  <div style="display:flex;gap:8px">
+    <select id="provider" title="Choose provider" style="padding:8px;border-radius:8px">
+      <option value="demo">Demo (no provider)</option>
+      <option value="openai">OpenAI (cost-optimized)</option>
+      <option value="gemini">Gemini</option>
+      <option value="deepseek">DeepSeek</option>
+      <option value="groq">Groq</option>
+    </select>
+
+    <input id="model" type="text" placeholder="model (optional)" style="padding:8px;border-radius:8px;min-width:140px" />
+
+    <input id="image" type="file" accept="image/*" style="padding:8px;border-radius:8px" />
   </div>
 
-  <script>
-    const messagesEl = document.getElementById('messages');
-    const inputEl = document.getElementById('input');
-    const sendBtn = document.getElementById('send');
+  <div style="display:flex;gap:8px;width:100%">
+    <input id="input" type="text" placeholder="Type a message and hit Enter" style="flex:1" />
+    <button id="send">Send</button>
+  </div>
 
-    function appendMessage(text, cls){
-      const div = document.createElement('div');
-      div.className = 'msg ' + cls;
-      div.textContent = text;
-      messagesEl.appendChild(div);
-      messagesEl.scrollTop = messagesEl.scrollHeight;
-    }
+  <small class="hint">Pick provider and model. Add an image (optional) — images are sent as base64 to server.</small>
+</div>
 
-    function botReply(userText){
-      // simple deterministic reply so demo works offline
-      const lower = userText.trim().toLowerCase();
-      if(!lower) return "Say something so I can reply.";
-      if(lower.includes('hi')||lower.includes('hello')) return "Hey — I'm a demo bot. Tell me what you want to do.";
-      if(lower.includes('help')) return "I can echo, reverse text, or show a sample response. Try: 'reverse hello'";
-      if(lower.startsWith('reverse ')) return userText.slice(8).split('').reverse().join('');
-      // fallback
-      return "Demo reply: " + userText.split('').reverse().slice(0,50).join('');
-    }
-
-    function sendMessage(){
-      const text = inputEl.value;
-      if(!text.trim()) return;
-      appendMessage('...', 'bot');
-
-      fetch("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: text })
-      })
-        .then(res => res.json())
-        .then(data => {
-          // remove '...'
-          const botPlaceholders = Array.from(messagesEl.querySelectorAll('.bot'));
-          const last = botPlaceholders[botPlaceholders.length - 1];
-          if (last && last.textContent === '...') last.remove();
-
-          appendMessage(data.reply || "error", 'bot');
-        })
-        .catch(err => {
-          console.error(err);
-          appendMessage("Server error.", 'bot');
-        });
-
-    }
-
-    sendBtn.addEventListener('click', sendMessage);
-    inputEl.addEventListener('keydown', (e) => {
-      if(e.key === 'Enter') sendMessage();
+<script>
+  // helper: file -> base64 string
+  function fileToBase64(file) {
+    return new Promise((resolve, reject) => {
+      if (!file) return resolve(null);
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result.split(',')[1]); // return base64 only
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
     });
+  }
 
-    // starter message
-    appendMessage("Hello — this is a local demo chat UI. It doesn't call any API yet.", 'bot');
-  </script>
+  // replace previous sendMessage logic with this one
+  async function sendMessage(){
+    const text = document.getElementById('input').value;
+    if(!text.trim()) return;
+    appendMessage(text, 'user');
+    document.getElementById('input').value = '';
+
+    appendMessage('...', 'bot');
+
+    const provider = document.getElementById('provider').value;
+    const model = document.getElementById('model').value || '';
+    const file = document.getElementById('image').files[0] || null;
+    const image_b64 = await fileToBase64(file);
+
+    try {
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: text, provider, model, image_b64 })
+      });
+      const data = await res.json();
+
+      // remove '...'
+      const botPlaceholders = Array.from(messagesEl.querySelectorAll('.bot'));
+      const last = botPlaceholders[botPlaceholders.length-1];
+      if(last && last.textContent === '...') last.remove();
+
+      appendMessage(data.reply || data.error || "No reply", 'bot');
+    } catch (err) {
+      console.error(err);
+      appendMessage("Server error.", 'bot');
+    }
+  }
+
+  sendBtn.removeEventListener('click', sendMessage); // safe remove then add
+  sendBtn.addEventListener('click', sendMessage);
+  inputEl.removeEventListener('keydown', (e)=>{}); // harmless, then add proper handler
+  inputEl.addEventListener('keydown', (e) => {
+    if(e.key === 'Enter') sendMessage();
+  });
+</script>
 </body>
 </html>
