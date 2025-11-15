@@ -23,52 +23,60 @@
     <div class="header">fast-groq-chatbot — demo</div>
     <div id="messages" class="messages" aria-live="polite"></div>
 
-    <div class="composer" style="flex-direction:column;gap:8px">
-  <div style="display:flex;gap:8px">
-    <select id="provider" title="Choose provider" style="padding:8px;border-radius:8px">
-      <option value="demo">Demo (no provider)</option>
-      <option value="openai">OpenAI (cost-optimized)</option>
-      <option value="gemini">Gemini</option>
-      <option value="deepseek">DeepSeek</option>
-      <option value="groq">Groq</option>
+ <!-- START: composer (replace existing .composer block) -->
+<div class="composer" style="flex-direction:column;gap:8px">
+  <div style="display:flex;gap:8px;align-items:center">
+    <!-- Provider fixed to Groq for user simplicity -->
+    <label style="font-weight:600;margin-right:6px">Provider:</label>
+    <select id="provider" title="Choose provider" style="padding:8px;border-radius:8px" disabled>
+      <option value="groq">Groq (recommended)</option>
     </select>
 
-    <input id="model" type="text" placeholder="model (optional)" style="padding:8px;border-radius:8px;min-width:140px" />
+    <!-- MODEL DROPDOWN (user friendly names shown) -->
+    <label style="font-weight:600;margin-left:12px;margin-right:6px">Model:</label>
+    <select id="model" style="padding:8px;border-radius:8px">
+      <option value="llama-3.1-8b-instant">Groq — Llama 3.1 8B (cheap, fast)</option>
+      <option value="llama-3.3-70b-versatile">Groq — Llama 3.3 70B (higher quality)</option>
+      <option value="mixtral-8x7b-32768">Groq — Mixtral 8x7b (balanced)</option>
+      <option value="openai/gpt-oss-20b">Groq — GPT-OSS 20B (OpenAI compat)</option>
+    </select>
 
-    <input id="image" type="file" accept="image/*" style="padding:8px;border-radius:8px" />
+    <!-- Image upload (optional) -->
+    <input id="image" type="file" accept="image/*" style="padding:8px;border-radius:8px;margin-left:12px" />
   </div>
 
-  <div style="display:flex;gap:8px;width:100%">
-    <input id="input" type="text" placeholder="Type a message and hit Enter" style="flex:1" />
-    <button id="send">Send</button>
+  <div style="display:flex;gap:8px;width:100%;margin-top:8px">
+    <input id="input" type="text" placeholder="Type a message and hit Enter" style="flex:1;padding:10px;border-radius:8px;border:1px solid #183047;background:#06101a;color:#e6eef8" />
+    <button id="send" style="padding:10px 14px;border-radius:8px;border:none;background:#0ea5a0;color:#021014;font-weight:700;cursor:pointer">Send</button>
   </div>
 
-  <small class="hint">Pick provider and model. Add an image (optional) — images are sent as base64 to server.</small>
+  <small class="hint">Model list is curated for cost/quality tradeoffs. Add image (optional) — keep images small (&lt;1–2MB).</small>
 </div>
 
 <script>
-  // helper: file -> base64 string
+  // helper: file -> base64 string (returns base64 without data:prefix)
   function fileToBase64(file) {
     return new Promise((resolve, reject) => {
       if (!file) return resolve(null);
       const reader = new FileReader();
-      reader.onload = () => resolve(reader.result.split(',')[1]); // return base64 only
+      reader.onload = () => resolve(reader.result.split(',')[1] || null);
       reader.onerror = reject;
       reader.readAsDataURL(file);
     });
   }
 
-  // replace previous sendMessage logic with this one
+  // main sendMessage (uses provider=groq and selected model)
   async function sendMessage(){
-    const text = document.getElementById('input').value;
-    if(!text.trim()) return;
+    const textInput = document.getElementById('input');
+    const text = textInput.value;
+    if(!text?.trim()) return;
     appendMessage(text, 'user');
-    document.getElementById('input').value = '';
+    textInput.value = '';
 
     appendMessage('...', 'bot');
 
-    const provider = document.getElementById('provider').value;
-    const model = document.getElementById('model').value || '';
+    const provider = document.getElementById('provider').value; // 'groq'
+    const model = document.getElementById('model').value;
     const file = document.getElementById('image').files[0] || null;
     const image_b64 = await fileToBase64(file);
 
@@ -92,12 +100,12 @@
     }
   }
 
-  sendBtn.removeEventListener('click', sendMessage); // safe remove then add
+  // wire events
+  sendBtn.removeEventListener('click', sendMessage); // safe no-op if not previously bound
   sendBtn.addEventListener('click', sendMessage);
-  inputEl.removeEventListener('keydown', (e)=>{}); // harmless, then add proper handler
-  inputEl.addEventListener('keydown', (e) => {
-    if(e.key === 'Enter') sendMessage();
-  });
+  inputEl.addEventListener('keydown', (e) => { if(e.key === 'Enter') sendMessage(); });
 </script>
+<!-- END: composer -->
+
 </body>
 </html>
