@@ -1,0 +1,84 @@
+﻿<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>fast-groq-chatbot - demo</title>
+  <style>
+    body{font-family:Inter,system-ui,Arial;margin:0;background:#0f1724;color:#e6eef8;display:flex;align-items:center;justify-content:center;height:100vh}
+    .app{width:420px;background:#0b1220;border-radius:12px;padding:16px;box-shadow:0 8px 30px rgba(2,6,23,.6)}
+    .header{font-weight:700;font-size:18px;margin-bottom:12px;text-align:center}
+    .messages{height:360px;overflow:auto;padding:12px;background:#071025;border-radius:8px;display:flex;flex-direction:column;gap:8px}
+    .msg{max-width:78%;padding:8px 10px;border-radius:10px;line-height:1.2}
+    .user{align-self:flex-end;background:#1e3a8a;color:#fff;border-bottom-right-radius:2px}
+    .bot{align-self:flex-start;background:#142033;color:#dbeafe;border-bottom-left-radius:2px}
+    .composer{display:flex;gap:8px;margin-top:12px}
+    input[type="text"]{flex:1;padding:10px;border-radius:8px;border:1px solid #183047;background:#06101a;color:#e6eef8}
+    button{padding:10px 14px;border-radius:8px;border:none;background:#0ea5a0;color:#021014;font-weight:700;cursor:pointer}
+    small.hint{display:block;margin-top:8px;color:#8fb0c9;text-align:center}
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div class="header">fast-groq-chatbot — demo</div>
+    <div id="messages" class="messages" aria-live="polite"></div>
+
+    <div class="composer">
+      <input id="input" type="text" placeholder="Type a message and hit Enter" />
+      <button id="send">Send</button>
+    </div>
+    <small class="hint">This is a local frontend demo. Later we will wire it to your API.</small>
+  </div>
+
+  <script>
+    const messagesEl = document.getElementById('messages');
+    const inputEl = document.getElementById('input');
+    const sendBtn = document.getElementById('send');
+
+    function appendMessage(text, cls){
+      const div = document.createElement('div');
+      div.className = 'msg ' + cls;
+      div.textContent = text;
+      messagesEl.appendChild(div);
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+    }
+
+    function botReply(userText){
+      // simple deterministic reply so demo works offline
+      const lower = userText.trim().toLowerCase();
+      if(!lower) return "Say something so I can reply.";
+      if(lower.includes('hi')||lower.includes('hello')) return "Hey — I'm a demo bot. Tell me what you want to do.";
+      if(lower.includes('help')) return "I can echo, reverse text, or show a sample response. Try: 'reverse hello'";
+      if(lower.startsWith('reverse ')) return userText.slice(8).split('').reverse().join('');
+      // fallback
+      return "Demo reply: " + userText.split('').reverse().slice(0,50).join('');
+    }
+
+    function sendMessage(){
+      const text = inputEl.value;
+      if(!text.trim()) return;
+      appendMessage(text, 'user');
+      inputEl.value = '';
+      // show typing indicator
+      appendMessage('...', 'bot');
+      // simulate network delay
+      setTimeout(() => {
+        // remove the '...' last bot message
+        const botPlaceholders = Array.from(messagesEl.querySelectorAll('.bot'));
+        const last = botPlaceholders[botPlaceholders.length-1];
+        if(last && last.textContent === '...') last.remove();
+        const reply = botReply(text);
+        appendMessage(reply, 'bot');
+      }, 650);
+    }
+
+    sendBtn.addEventListener('click', sendMessage);
+    inputEl.addEventListener('keydown', (e) => {
+      if(e.key === 'Enter') sendMessage();
+    });
+
+    // starter message
+    appendMessage("Hello — this is a local demo chat UI. It doesn't call any API yet.", 'bot');
+  </script>
+</body>
+</html>
