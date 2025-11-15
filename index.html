@@ -306,6 +306,10 @@
       color: #06b6b0;
       margin-top: 2px;
     }
+
+    .warning {
+      color: #fbbf24 !important;
+    }
   </style>
 </head>
 
@@ -329,12 +333,12 @@
         <select id="model">
           <option value="llama-3.1-8b-instant">Llama 3.1 8B — Fast & Cheap</option>
           <option value="llama-3.3-70b-versatile">Llama 3.3 70B — High Quality</option>
-          <option value="llama-3.2-11b-vision-preview" data-vision="true">Llama 3.2 11B — Vision</option>
-          <option value="llama-3.2-90b-vision-preview" data-vision="true">Llama 3.2 90B — Vision Pro</option>
+          <option value="llama-3.2-11b-text-preview">Llama 3.2 11B — Text Only</option>
+          <option value="llama-3.2-90b-text-preview">Llama 3.2 90B — Text Pro</option>
           <option value="mixtral-8x7b-32768">Mixtral 8x7B — Balanced</option>
         </select>
 
-        <div class="file-upload" id="fileUploadBtn">
+        <div class="file-upload" id="fileUploadBtn" style="display: none;">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
             <path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z"/>
           </svg>
@@ -353,8 +357,6 @@
         </button>
       </div>
     </div>
-
-    <div class="file-info" id="fileInfo">Images: Small JPG/PNG only (<0.5MB)</div>
   </div>
 
   <script>
@@ -369,27 +371,12 @@
 
     let isProcessing = false;
 
-    // Model capabilities
-    const visionModels = new Set([
-      'llama-3.2-11b-vision-preview',
-      'llama-3.2-90b-vision-preview'
-    ]);
-
     function updateModelInfo() {
       const selectedModel = modelSelect.value;
-      const isVisionModel = visionModels.has(selectedModel);
-      
-      if (isVisionModel) {
-        modelInfo.textContent = "Supports: Text + Images";
-        modelInfo.style.color = '#06b6b0';
-        fileUploadBtn.style.display = 'flex';
-      } else {
-        modelInfo.textContent = "Supports: Text only";
-        modelInfo.style.color = '#8ca3c7';
-        fileUploadBtn.style.display = 'none';
-        imageInput.value = '';
-        updateFileInfo();
-      }
+      modelInfo.textContent = "Supports: Text only";
+      modelInfo.style.color = '#8ca3c7';
+      fileUploadBtn.style.display = 'none';
+      fileInfo.style.color = '#fbbf24';
     }
 
     function appendMessage(text, cls, isError = false) {
@@ -412,100 +399,33 @@
       messagesEl.scrollTop = messagesEl.scrollHeight;
     }
 
-    function updateFileInfo() {
-      const file = imageInput.files[0];
-      if (file) {
-        const size = (file.size / 1024 / 1024).toFixed(2);
-        fileInfo.textContent = `📎 ${file.name} (${size}MB)`;
-        fileInfo.style.color = '#06b6b0';
-      } else {
-        fileInfo.textContent = 'Images: Small JPG/PNG only (<0.5MB)';
-        fileInfo.style.color = '#8ca3c7';
-      }
-    }
-
-    function compressImage(file, maxWidth = 800, quality = 0.7) {
-      return new Promise((resolve) => {
-        if (!file || !file.type.startsWith('image/')) {
-          resolve(null);
-          return;
-        }
-
-        // Skip compression for very small files
-        if (file.size < 100 * 1024) { // < 100KB
-          const reader = new FileReader();
-          reader.onload = () => resolve(reader.result.split(",")[1]);
-          reader.readAsDataURL(file);
-          return;
-        }
-
-        const img = new Image();
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
-
-        img.onload = () => {
-          let width = img.width;
-          let height = img.height;
-
-          // Calculate new dimensions
-          if (width > maxWidth) {
-            height = (height * maxWidth) / width;
-            width = maxWidth;
-          }
-
-          canvas.width = width;
-          canvas.height = height;
-
-          ctx.drawImage(img, 0, 0, width, height);
-
-          canvas.toBlob((blob) => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(reader.result.split(",")[1]);
-            reader.readAsDataURL(blob);
-          }, 'image/jpeg', quality);
-        };
-
-        img.src = URL.createObjectURL(file);
-      });
-    }
-
     async function sendMessage() {
       if (isProcessing) return;
       
       const text = inputEl.value.trim();
       const model = modelSelect.value;
-      const file = imageInput.files[0] || null;
-      
-      // Check if image is uploaded but model doesn't support vision
-      if (file && !visionModels.has(model)) {
-        appendMessage("This model doesn't support images. Please switch to a vision model.", "bot", true);
-        return;
-      }
 
-      if (!text && !file) return;
+      if (!text) return;
 
       isProcessing = true;
       sendBtn.disabled = true;
       sendBtn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 18a8 8 0 1 1 8-8 8 8 0 0 1-8 8z" opacity=".5"/><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 18a8 8 0 1 1 8-8 8 8 0 0 1-8 8z"/></svg>`;
 
       // User message
-      if (text) appendMessage(text, "user");
+      appendMessage(text, "user");
       inputEl.value = "";
 
       // Bot typing
       appendMessage("...", "bot");
 
       try {
-        const image_b64 = await compressImage(file);
-
         const res = await fetch("/api/chat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             message: text,
             provider: "groq",
-            model,
-            image_b64
+            model
           })
         });
 
@@ -517,7 +437,11 @@
         if (last && last.querySelector('.typing-indicator')) last.remove();
 
         if (data.error) {
-          appendMessage(`Error: ${data.error}`, "bot", true);
+          let errorMsg = data.error;
+          if (data.details) {
+            errorMsg += `: ${data.details}`;
+          }
+          appendMessage(`Error: ${errorMsg}`, "bot", true);
         } else {
           appendMessage(data.reply || "No response received", "bot");
         }
@@ -546,7 +470,6 @@
       }
     };
 
-    imageInput.onchange = updateFileInfo;
     modelSelect.onchange = updateModelInfo;
     
     // Focus input on load
@@ -557,7 +480,7 @@
 
     // Add welcome message
     setTimeout(() => {
-      appendMessage("Hey! I'm your Groq-powered AI assistant. Choose a model and ask me anything! For images, use Llama 3.2 Vision models.", "bot");
+      appendMessage("Hey! I'm your Groq-powered AI assistant. Choose any model and ask me anything!", "bot");
     }, 500);
   </script>
 </body>
