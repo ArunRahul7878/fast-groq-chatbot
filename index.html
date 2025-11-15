@@ -101,9 +101,14 @@
   }
 
   // wire events
-  sendBtn.removeEventListener('click', sendMessage); // safe no-op if not previously bound
-  sendBtn.addEventListener('click', sendMessage);
-  inputEl.addEventListener('keydown', (e) => { if(e.key === 'Enter') sendMessage(); });
+// wire events (grab local DOM elements to avoid scope issues)
+const sendBtnLocal = document.getElementById('send');
+const inputElLocal = document.getElementById('input');
+
+// safe binding: don't assume previous listeners
+sendBtnLocal.onclick = sendMessage;
+inputElLocal.onkeydown = (e) => { if (e.key === 'Enter') sendMessage(); };
+
 </script>
 <!-- END: composer -->
 
