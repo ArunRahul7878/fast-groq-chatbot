@@ -57,19 +57,27 @@
     function sendMessage(){
       const text = inputEl.value;
       if(!text.trim()) return;
-      appendMessage(text, 'user');
-      inputEl.value = '';
-      // show typing indicator
       appendMessage('...', 'bot');
-      // simulate network delay
-      setTimeout(() => {
-        // remove the '...' last bot message
-        const botPlaceholders = Array.from(messagesEl.querySelectorAll('.bot'));
-        const last = botPlaceholders[botPlaceholders.length-1];
-        if(last && last.textContent === '...') last.remove();
-        const reply = botReply(text);
-        appendMessage(reply, 'bot');
-      }, 650);
+
+      fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: text })
+      })
+        .then(res => res.json())
+        .then(data => {
+          // remove '...'
+          const botPlaceholders = Array.from(messagesEl.querySelectorAll('.bot'));
+          const last = botPlaceholders[botPlaceholders.length - 1];
+          if (last && last.textContent === '...') last.remove();
+
+          appendMessage(data.reply || "error", 'bot');
+        })
+        .catch(err => {
+          console.error(err);
+          appendMessage("Server error.", 'bot');
+        });
+
     }
 
     sendBtn.addEventListener('click', sendMessage);
