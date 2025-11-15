@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>fast-groq-chatbot</title>
+
+  <style>
+    body {
+      margin: 0;
+      background: #0e1525;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      font-family: Inter, system-ui, Arial;
+      color: #e5eef7;
+    }
+
+    .app {
+      width: 460px;
+      background: #111a2b;
+      padding: 20px;
+      border-radius: 14px;
+      box-shadow: 0 0 40px rgba(0,0,0,0.4);
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .header {
+      text-align: center;
+      font-size: 20px;
+      font-weight: 700;
+      margin-bottom: 8px;
+      color: #b6caf0;
+    }
+
+    .messages {
+      height: 380px;
+      overflow-y: auto;
+      background: #0b1220;
+      border-radius: 10px;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      box-shadow: inset 0 0 15px rgba(0,0,0,0.35);
+    }
+
+    .msg {
+      max-width: 80%;
+      padding: 10px 12px;
+      border-radius: 10px;
+      font-size: 14px;
+      line-height: 1.4;
+      white-space: pre-wrap;
+    }
+
+    .user {
+      align-self: flex-end;
+      background: #1f3a8a;
+      color: white;
+      border-bottom-right-radius: 4px;
+    }
+
+    .bot {
+      align-self: flex-start;
+      background: #16233a;
+      color: #d9e5ff;
+      border-bottom-left-radius: 4px;
+    }
+
+    .row {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    select, input[type="file"] {
+      padding: 8px;
+      font-size: 13px;
+      border-radius: 8px;
+      background: #06101a;
+      border: 1px solid #2e4b68;
+      color: #d8e9ff;
+    }
+
+    input[type="text"] {
+      flex: 1;
+      padding: 10px;
+      font-size: 14px;
+      border-radius: 8px;
+      border: 1px solid #2e4b68;
+      background: #06101a;
+      color: #e6eef8;
+    }
+
+    button {
+      padding: 10px 16px;
+      border-radius: 8px;
+      border: none;
+      background: #06b6b0;
+      font-weight: 700;
+      color: #021014;
+      cursor: pointer;
+      transition: 0.15s;
+    }
+
+    button:hover {
+      transform: scale(1.04);
+      background: #0dd3cc;
+    }
+
+    small {
+      text-align: center;
+      color: #8ca3c7;
+      margin-top: -4px;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="app">
+    <div class="header">fast-groq-chatbot — demo</div>
+
+    <div id="messages" class="messages"></div>
+
+    <!-- Controls -->
+    <div class="row">
+      <label style="font-size:14px; font-weight:600;">Model:</label>
+      <select id="model">
+        <option value="llama-3.1-8b-instant">Llama 3.1 8B — Fast & Cheap</option>
+        <option value="llama-3.3-70b-versatile">Llama 3.3 70B — High Quality</option>
+        <option value="mixtral-8x7b-32768">Mixtral 8x7B — Balanced</option>
+        <option value="openai/gpt-oss-20b">GPT-OSS 20B</option>
+      </select>
+
+      <input id="image" type="file" accept="image/*" />
+    </div>
+
+    <div class="row">
+      <input id="input" type="text" placeholder="Type a message..." />
+      <button id="send">Send</button>
+    </div>
+
+    <small>Groq models only. Images optional (&lt;1–2MB recommended).</small>
+  </div>
+
+  <script>
+    const messagesEl = document.getElementById("messages");
+    const sendBtn = document.getElementById("send");
+    const inputEl = document.getElementById("input");
+
+    function appendMessage(text, cls) {
+      const div = document.createElement("div");
+      div.className = "msg " + cls;
+      div.textContent = text;
+      messagesEl.appendChild(div);
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+    }
+
+    function fileToBase64(file) {
+      return new Promise((resolve, reject) => {
+        if (!file) return resolve(null);
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result.split(",")[1]);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+    }
+
+    async function sendMessage() {
+      const text = inputEl.value.trim();
+      const model = document.getElementById("model").value;
+      const file = document.getElementById("image").files[0] || null;
+      const image_b64 = await fileToBase64(file);
+
+      if (!text && !image_b64) return;
+
+      // user message
+      if (text) appendMessage(text, "user");
+      inputEl.value = "";
+
+      // bot typing
+      appendMessage("...", "bot");
+
+      try {
+        const res = await fetch("/api/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            message: text,
+            provider: "groq",
+            model,
+            image_b64
+          })
+        });
+
+        const data = await res.json();
+
+        // remove ...
+        const bots = messagesEl.querySelectorAll(".bot");
+        const last = bots[bots.length - 1];
+        if (last && last.textContent === "...") last.remove();
+
+        appendMessage(data.reply || data.error || "No reply", "bot");
+      } catch (err) {
+        console.error(err);
+
+        const bots = messagesEl.querySelectorAll(".bot");
+        const last = bots[bots.length - 1];
+        if (last && last.textContent === "...") last.remove();
+
+        appendMessage("Server error.", "bot");
+      }
+    }
+
+    sendBtn.onclick = sendMessage;
+    inputEl.onkeydown = (e) => e.key === "Enter" && sendMessage();
+  </script>
+
+</body>
+</html>
